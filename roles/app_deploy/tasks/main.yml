@@ -38,3 +38,29 @@
       (openliberty_applications | selectattr('state', 'undefined') | list | length > 0)
       or (openliberty_applications | selectattr('state', 'equalto', 'present') | list | length > 0)
   notify: Restart Open Liberty service
+
+# Probe only after the archives are in place, the configDropins <application>
+# entries exist, and any pending restart has run.
+- name: Flush handlers before readiness probe
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for applications to respond on their context roots
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ openliberty_http_port }}{{ _app_context_root }}"
+    method: GET
+    status_code: [200, 201, 301, 302, 403]
+    timeout: 10
+  register: _app_probe
+  retries: "{{ (openliberty_deploy_wait_timeout | int // openliberty_deploy_wait_delay | int) | int }}"
+  delay: "{{ openliberty_deploy_wait_delay }}"
+  until: _app_probe.status in [200, 201, 301, 302, 403]
+  loop: "{{ openliberty_applications | rejectattr('state', 'defined') | list + openliberty_applications | selectattr('state', 'equalto', 'present') | list }}"
+  loop_control:
+    loop_var: _app
+    label: "{{ _app.name }}"
+  vars:
+    # dropins: Liberty derives the context root from the archive file name.
+    _app_context_root: >-
+      {{ _app.context_root | default('/' ~ (_app.name if not openliberty_deploy_to_dropins | bool
+         else (_app.src | basename | splitext | first))) }}
+  when: openliberty_deploy_validate | bool

@@ -21,26 +21,6 @@
   when: _app_state == 'absent'
   notify: Restart Open Liberty service
 
-- name: Stat existing deployment archive
-  ansible.builtin.stat:
-    path: "{{ _app_dest }}"
-  register: _existing_app
-  when: _app_state == 'present'
-
-- name: Backup existing archive before replacement
-  ansible.builtin.copy:
-    src: "{{ _app_dest }}"
-    dest: "{{ _app_dest }}.{{ ansible_date_time.iso8601_basic_short }}.bak"
-    remote_src: true
-    owner: "{{ openliberty_user }}"
-    group: "{{ openliberty_group }}"
-    mode: "0640"
-  become: true
-  when:
-    - _app_state == 'present'
-    - openliberty_deploy_backup | bool
-    - _existing_app.stat.exists | default(false)
-
 - name: Copy application archive from controller or managed node
   ansible.builtin.copy:
     src: "{{ _app_src }}"
@@ -49,8 +29,9 @@
     owner: "{{ openliberty_user }}"
     group: "{{ openliberty_group }}"
     mode: "0640"
-    backup: false
+    backup: "{{ openliberty_deploy_backup | bool }}"
   become: true
+  register: _app_copy_result
   when:
     - _app_state == 'present'
     - _app_src is not match('^https?://')
@@ -65,7 +46,9 @@
     group: "{{ openliberty_group }}"
     mode: "0640"
     timeout: 120
+    backup: "{{ openliberty_deploy_backup | bool }}"
   become: true
+  register: _app_download_checksum_result
   when:
     - _app_state == 'present'
     - _app_src is match('^https?://')
@@ -80,36 +63,28 @@
     group: "{{ openliberty_group }}"
     mode: "0640"
     timeout: 120
+    backup: "{{ openliberty_deploy_backup | bool }}"
   become: true
+  register: _app_download_result
   when:
     - _app_state == 'present'
     - _app_src is match('^https?://')
     - _app.checksum is not defined
   notify: Restart Open Liberty service
 
-- name: Flush handlers before readiness probe
-  ansible.builtin.meta: flush_handlers
-  when:
-    - _app_state == 'present'
-    - openliberty_deploy_validate | bool
-
-- name: Determine context root for readiness probe
-  ansible.builtin.set_fact:
-    _app_context_root: "{{ _app.context_root | default('/' + _app.name) }}"
-  when:
-    - _app_state == 'present'
-    - openliberty_deploy_validate | bool
-
-- name: Wait for application to respond on context root
-  ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ openliberty_http_port }}{{ _app_context_root }}"
-    method: GET
-    status_code: [200, 201, 301, 302, 403]
-    timeout: 10
-  register: _app_probe
-  retries: "{{ (openliberty_deploy_wait_timeout | int // openliberty_deploy_wait_delay | int) | int }}"
-  delay: "{{ openliberty_deploy_wait_delay }}"
-  until: _app_probe.status in [200, 201, 301, 302, 403]
-  when:
-    - _app_state == 'present'
-    - openliberty_deploy_validate | bool
+# copy/get_url only create a backup when the archive content changed; rename it
+# to the documented <archive>.<timestamp>.bak convention.
+- name: Rename backup of replaced archive to timestamped .bak
+  ansible.builtin.command:
+    cmd: >-
+      mv {{ _app_backup_file | quote }}
+      {{ (_app_dest ~ '.' ~ ansible_date_time.iso8601_basic_short ~ '.bak') | quote }}
+  become: true
+  changed_when: true
+  loop: >-
+    {{ [_app_copy_result | default({}), _app_download_checksum_result | default({}),
+        _app_download_result | default({})]
+       | selectattr('backup_file', 'defined') | map(attribute='backup_file') | list }}
+  loop_control:
+    loop_var: _app_backup_file
+  when: _app_state == 'present'

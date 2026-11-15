@@ -32,10 +32,12 @@
         patterns: "*.bak"
       register: _bak_files
 
-    - name: Assert at least one timestamped backup was created
+    - name: Assert exactly one timestamped backup was created
       ansible.builtin.assert:
-        that: _bak_files.matched >= 1
-        fail_msg: "No .bak backup archive found – backup step may not have run"
+        that: _bak_files.matched == 1
+        fail_msg: >-
+          Expected exactly one .bak archive (only the changed redeploy should back up),
+          found {{ _bak_files.matched }}"
         success_msg: "Timestamped backup archive present: {{ _bak_files.files | map(attribute='path') | list }}"
 
     - name: Assert dropins/ WAR is owned by liberty user
