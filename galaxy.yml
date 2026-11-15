@@ -5,6 +5,7 @@ version: "1.0.1"
 readme: README.md
 authors:
   - Harsha Cherukuri <hcheruku@redhat.com>
+  - Ranabir Chakraborty <ranabir@ibm.com>
 description: >
   Ansible collection to install, configure, and manage IBM Open Liberty
   application server. Supports Core Profile, Web Profile, and Platform (Full Platform)

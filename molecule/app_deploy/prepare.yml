@@ -38,6 +38,12 @@
         dest: /tmp/sample_war/WEB-INF/web.xml
         mode: "0644"
 
+    - name: Copy index page so the readiness probe gets HTTP 200
+      ansible.builtin.copy:
+        src: index.html
+        dest: /tmp/sample_war/index.html
+        mode: "0644"
+
     - name: Package skeleton into sample.war
       ansible.builtin.command:
         cmd: zip -r /tmp/sample.war .
