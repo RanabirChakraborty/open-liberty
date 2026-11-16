@@ -20,3 +20,13 @@ releases:
     - 3.yaml
     - 4.yaml
     release_date: '2026-09-22'
+  1.0.1:
+    changes:
+      minor_changes:
+      - 'AMW-677 open-liberty collection''s app_deploy: readiness probe always fails
+        in explicit mode, and backups make redeploys non-idempotent `#8 <https://github.com/ansible-middleware/open-liberty/pull/8>`_
+
+        '
+    fragments:
+    - 8.yaml
+    release_date: '2026-11-16'

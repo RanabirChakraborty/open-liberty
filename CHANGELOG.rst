@@ -4,6 +4,14 @@ middleware\_automation.open\_liberty Release Notes
 
 .. contents:: Topics
 
+v1.0.1
+======
+
+Minor Changes
+-------------
+
+- AMW-677 open-liberty collection's app_deploy: readiness probe always fails in explicit mode, and backups make redeploys non-idempotent `#8 <https://github.com/ansible-middleware/open-liberty/pull/8>`_
+
 v1.0.0
 ======
 
