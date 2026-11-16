@@ -1,10 +1,8 @@
- ==================================================
- middleware\_automation.open\_liberty Release Notes
- ==================================================
- - Initial roles for install, upgrade and deploy apps with IBM Open Liberty #1
- - Setup docs, .github files, changelog and docs. Fixed issues with Sanity and molecule tests. #3
+ v1.0.1
+ ======
  
  Minor Changes
  -------------
  
- - Fix version in galaxy.yml and release pipeline #4
+ - AMW-677 open-liberty collection's app_deploy: readiness probe always fails in explicit mode, and backups make redeploys non-idempotent #8
+ 
