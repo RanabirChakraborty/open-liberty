@@ -1,7 +1,8 @@
 ---
 # converge.yml – app_deploy scenario
 # Runs the app_deploy role twice:
-#   Pass 1 – explicit server.xml (configDropins) mode
+#   Pass 1 – explicit server.xml (configDropins) mode, with readiness probe
+#            (deploy, redeploy a changed WAR → one backup, redeploy unchanged → no new backup)
 #   Pass 2 – dropins mode
 # sample.war is built on the managed node by prepare.yml (/tmp/sample.war)
 - name: Converge – Application Deployment
@@ -14,7 +15,8 @@
         name: middleware_automation.open_liberty.app_deploy
       vars:
         openliberty_deploy_to_dropins: false
-        openliberty_deploy_validate: false  # no servlet, skip HTTP probe
+        # Probe runs after app_deploy.xml is written; sample.war serves index.html.
+        openliberty_deploy_validate: true
         openliberty_deploy_backup: true
         openliberty_applications:
           - name: sample
@@ -23,8 +25,29 @@
             context_root: /sample
             state: present
 
-    # Redeploy once so the backup step has an existing archive to replace.
-    - name: Redeploy sample.war to exercise backup
+    # Change the WAR content so the redeploy replaces the archive and takes a backup.
+    - name: Add a file to sample.war to change its content
+      ansible.builtin.shell:
+        cmd: echo v2 > /tmp/sample_war/version.txt && zip -r /tmp/sample.war .
+        chdir: /tmp/sample_war
+      changed_when: true
+
+    - name: Redeploy changed sample.war to exercise backup
+      ansible.builtin.include_role:
+        name: middleware_automation.open_liberty.app_deploy
+      vars:
+        openliberty_deploy_to_dropins: false
+        openliberty_deploy_validate: false
+        openliberty_deploy_backup: true
+        openliberty_applications:
+          - name: sample
+            src: /tmp/sample.war
+            remote_src: true
+            context_root: /sample
+            state: present
+
+    # Same content again: must not create another backup (idempotent redeploy).
+    - name: Redeploy unchanged sample.war
       ansible.builtin.include_role:
         name: middleware_automation.open_liberty.app_deploy
       vars:
